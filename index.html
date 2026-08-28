@@ -1,191 +1,249 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Assistente visual para pessoas com deficiência visual. Usa câmera e IA para descrever o ambiente por voz." />
 
-    <meta charset="UTF-8">
+  <!-- PWA: manifesto para instalação na tela inicial do Android -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+  <title>VisionAid — Assistente Visual</title>
 
-    <meta
-        name="theme-color"
-        content="#000000"
-    >
+  <!-- Folha de estilos principal -->
+  <link rel="stylesheet" href="styles.css" />
 
-    <title>Óculos Assistivo</title>
-
-    <link
-        rel="stylesheet"
-        href="style.css"
-    >
-
+  <!--
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  DEPENDÊNCIAS EXTERNAS (CDN)                                 ║
+    ╠══════════════════════════════════════════════════════════════╣
+    ║  1. TensorFlow.js v4.17.0                                    ║
+    ║     Motor de inferência de Machine Learning no navegador.    ║
+    ║     Licença: Apache 2.0                                      ║
+    ║     https://www.tensorflow.org/js                            ║
+    ║                                                              ║
+    ║  2. COCO-SSD v2.2.3                                          ║
+    ║     Modelo pré-treinado para detecção de objetos em tempo    ║
+    ║     real. Detecta 80 categorias (pessoas, cadeiras etc.)     ║
+    ║     Licença: Apache 2.0                                      ║
+    ║     https://github.com/tensorflow/tfjs-models/coco-ssd       ║
+    ║                                                              ║
+    ║  ⚠ O PRIMEIRO carregamento requer conexão à internet para    ║
+    ║    baixar os pesos do modelo (~5-6 MB). Após isso, o         ║
+    ║    Service Worker fará cache e o app funcionará offline.     ║
+    ╚══════════════════════════════════════════════════════════════╝
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
 </head>
 
 <body>
 
-    <main class="app">
+  <!-- ================================================================
+       TELA DE BOAS-VINDAS
+       Exibida ao abrir o app. Explica o funcionamento e pede
+       consentimento explícito antes de qualquer acesso à câmera.
+  ================================================================ -->
+  <main
+    id="tela-boas-vindas"
+    class="tela-inicial"
+    role="main"
+    aria-label="Tela de boas-vindas do VisionAid">
 
-        <header class="header">
+    <div class="logo-area" aria-hidden="true">
+      <span class="logo-icone">👁️</span>
+    </div>
 
-            <h1>Óculos Assistivo</h1>
+    <h1 class="titulo-app">VisionAid</h1>
+    <p class="subtitulo-app">Assistente Visual por Inteligência Artificial</p>
 
-            <p id="status">
-                Sistema desligado
-            </p>
+    <section class="descricao-app" aria-label="Como o aplicativo funciona">
+      <p>
+        Este aplicativo usa a <strong>câmera traseira</strong> do seu celular
+        e inteligência artificial para identificar pessoas e objetos à sua
+        frente, anunciando as informações em <strong>voz em português</strong>.
+      </p>
+      <p>
+        🔒 <strong>Privacidade:</strong> todo o processamento ocorre
+        <strong>localmente</strong> no dispositivo. Nenhuma imagem é
+        armazenada, gravada ou enviada a servidores.
+      </p>
+      <p>
+        Para começar, toque no botão abaixo e <strong>autorize o uso
+        da câmera</strong> quando o navegador solicitar.
+      </p>
+    </section>
 
-        </header>
+    <!-- Indicador de estado visível para o usuário -->
+    <div
+      id="status-badge"
+      class="status-badge status-aguardando"
+      role="status"
+      aria-live="polite"
+      aria-label="Estado atual do sistema">
+      ⏳ Aguardando permissão da câmera
+    </div>
 
+    <!-- Botão principal — ÚNICA ação que aciona getUserMedia -->
+    <button
+      id="btn-iniciar"
+      class="btn-principal"
+      aria-label="Toque para iniciar a câmera e o reconhecimento de objetos"
+      type="button">
+      📷 Iniciar câmera
+    </button>
 
-        <!-- CÂMERA -->
+    <!-- Área de mensagens de erro (inicialmente oculta) -->
+    <div
+      id="mensagem-erro"
+      class="mensagem-erro"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      hidden>
+    </div>
 
-        <section class="camera-container">
+  </main>
 
-            <video
-                id="camera"
-                autoplay
-                muted
-                playsinline
-            ></video>
+  <!-- ================================================================
+       TELA PRINCIPAL — câmera em tempo real + detecção
+       Permanece oculta até a câmera ser autorizada e iniciada.
+  ================================================================ -->
+  <section
+    id="tela-camera"
+    class="tela-camera"
+    hidden
+    aria-label="Visualização da câmera com detecção de objetos em tempo real">
 
-            <canvas
-                id="detectionCanvas"
-            ></canvas>
+    <!-- Contêiner do modo VR: em modo normal exibe apenas o olho esquerdo;
+         em modo VR exibe ambos lado a lado. -->
+    <div id="vr-container" class="vr-container" aria-hidden="true">
 
-            <div
-                id="cameraMessage"
-                class="camera-message"
-            >
-                Pressione iniciar
-            </div>
+      <!-- Olho esquerdo / visualização normal -->
+      <div class="vr-olho" id="olho-esquerdo">
+        <!--
+          <video> recebe o stream da câmera. O atributo playsinline
+          é obrigatório no iOS/Android para evitar fullscreen automático.
+          O vídeo em si fica invisível (opacity: 0), pois o canvas
+          é desenhado por cima com os bounding boxes.
+        -->
+        <video
+          id="video"
+          playsinline
+          muted
+          autoplay
+          aria-label="Stream da câmera traseira">
+        </video>
 
-        </section>
+        <!-- Canvas principal: exibe o frame da câmera + bounding boxes -->
+        <canvas
+          id="canvas"
+          aria-label="Imagem da câmera com caixas de detecção de objetos">
+        </canvas>
+      </div>
 
+      <!-- Olho direito — exibido apenas no modo VR Box -->
+      <div class="vr-olho" id="olho-direito">
+        <!-- Canvas espelhado do principal para o olho direito -->
+        <canvas
+          id="canvas-vr"
+          aria-label="Cópia da imagem para o olho direito do VR Box">
+        </canvas>
+      </div>
 
-        <!-- CONTROLES -->
+    </div>
 
-        <section class="controls">
+    <!-- ============================================================
+         BARRA DE CONTROLES sobreposta à câmera
+         Posicionada na parte inferior da tela.
+    ============================================================ -->
+    <nav
+      id="barra-controles"
+      class="barra-controles"
+      role="navigation"
+      aria-label="Controles do assistente visual">
 
-            <button
-                id="startButton"
-                class="primary"
-            >
-                📷 Iniciar sistema
-            </button>
+      <!-- Status do sistema — atualizado dinamicamente -->
+      <div
+        id="status-camera"
+        class="status-camera"
+        role="status"
+        aria-live="polite"
+        aria-label="Estado da câmera e do reconhecimento">
+        🔄 Reconhecimento carregando...
+      </div>
 
-            <button
-                id="stopButton"
-                disabled
-            >
-                ⛔ Parar
-            </button>
+      <!-- Grade de 5 botões de controle -->
+      <div class="controles-grid" role="group" aria-label="Ações disponíveis">
 
-            <button
-                id="voiceButton"
-            >
-                🎤 Comando de voz
-            </button>
+        <!-- Parar câmera -->
+        <button
+          id="btn-parar"
+          class="btn-controle btn-perigo"
+          aria-label="Parar câmera e encerrar reconhecimento"
+          type="button">
+          ⏹<span class="btn-label">Parar</span>
+        </button>
 
-        </section>
+        <!-- Ativar / desativar áudio -->
+        <button
+          id="btn-audio"
+          class="btn-controle btn-ativo"
+          aria-label="Desativar saída de voz"
+          aria-pressed="true"
+          type="button">
+          🔊<span class="btn-label">Áudio</span>
+        </button>
 
+        <!-- Ativar / desativar modo VR -->
+        <button
+          id="btn-vr"
+          class="btn-controle"
+          aria-label="Ativar modo VR Box"
+          aria-pressed="false"
+          type="button">
+          👓<span class="btn-label">VR</span>
+        </button>
 
-        <!-- INFORMAÇÕES -->
+        <!-- Repetir última descrição -->
+        <button
+          id="btn-repetir"
+          class="btn-controle"
+          aria-label="Repetir em voz a última descrição detectada"
+          type="button">
+          🔁<span class="btn-label">Repetir</span>
+        </button>
 
-        <section class="panel">
+        <!-- Tela cheia -->
+        <button
+          id="btn-fullscreen"
+          class="btn-controle"
+          aria-label="Alternar modo de tela cheia"
+          type="button">
+          ⛶<span class="btn-label">Tela cheia</span>
+        </button>
 
-            <h2>
-                Detecções
-            </h2>
+      </div>
 
-            <div id="detections">
-                Nenhum objeto detectado.
-            </div>
+      <!-- Painel de última detecção — útil na apresentação do TCC -->
+      <div
+        id="ultima-deteccao"
+        class="ultima-deteccao"
+        role="status"
+        aria-live="polite"
+        aria-label="Descrição do que foi detectado na cena">
+        Aguardando detecção...
+      </div>
 
-        </section>
+    </nav>
 
+  </section>
 
-        <section class="panel">
-
-            <h2>
-                Último aviso
-            </h2>
-
-            <p id="lastAlert">
-                Nenhum aviso.
-            </p>
-
-        </section>
-
-
-        <section class="panel">
-
-            <h2>
-                Sistema
-            </h2>
-
-            <div class="system-info">
-
-                <span>
-                    Câmera:
-                    <strong id="cameraStatus">
-                        Desligada
-                    </strong>
-                </span>
-
-                <span>
-                    IA:
-                    <strong id="aiStatus">
-                        Desligada
-                    </strong>
-                </span>
-
-                <span>
-                    Voz:
-                    <strong id="voiceStatus">
-                        Disponível
-                    </strong>
-                </span>
-
-            </div>
-
-        </section>
-
-    </main>
-
-
-    <!-- ============================= -->
-    <!-- BIBLIOTECAS DE IA              -->
-    <!-- ============================= -->
-
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
-
-
-    <!-- ============================= -->
-    <!-- NOSSOS ARQUIVOS                -->
-    <!-- ============================= -->
-
-    <script src="js/speech.js"></script>
-
-    <script src="js/proximity.js"></script>
-
-    <script src="js/alerts.js"></script>
-
-    <script src="js/detector.js"></script>
-
-    <script src="js/camera.js"></script>
-
-    <script src="js/commands.js"></script>
-
-    <script src="ai/face.js"></script>
-
-    <script src="ai/crosswalk.js"></script>
-
-    <script src="js/app.js"></script>
+  <!-- Script principal — carregado por último para garantir que o
+       DOM e as bibliotecas TF.js já estejam disponíveis -->
+  <script src="app.js"></script>
 
 </body>
-
 </html>

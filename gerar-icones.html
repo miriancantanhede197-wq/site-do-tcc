@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<!--
+  gerar-icones.html
+  Abra este arquivo no navegador para gerar os ícones PNG do PWA.
+  Clique no botão e faça download de cada ícone gerado.
+  Coloque os arquivos na pasta /icons/ do projeto.
+-->
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gerador de Ícones — VisionAid</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #111; color: #fff; padding: 20px; }
+    button { background: #FFD700; color: #000; border: none; padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 10px 0; }
+    .icones { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+    .icone-item { text-align: center; }
+    canvas { border: 1px solid #333; display: block; }
+    a { color: #FFD700; display: block; margin-top: 6px; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>Gerador de Ícones PWA — VisionAid</h1>
+  <p>Clique para gerar os ícones. Salve cada um na pasta <code>icons/</code> do projeto.</p>
+  <button onclick="gerarTodos()">🎨 Gerar todos os ícones</button>
+  <div id="icones" class="icones"></div>
+
+  <script>
+    const tamanhos = [72, 96, 128, 144, 152, 192, 384, 512];
+
+    function desenharIcone(tamanho) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = tamanho;
+      const ctx = canvas.getContext('2d');
+      const c = tamanho / 2;
+      const r = tamanho * 0.42;
+
+      // Fundo preto
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, tamanho, tamanho);
+
+      // Círculo dourado
+      ctx.beginPath();
+      ctx.arc(c, c, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = tamanho * 0.04;
+      ctx.stroke();
+
+      // Olho — elipse
+      ctx.beginPath();
+      ctx.ellipse(c, c, r * 0.65, r * 0.38, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = tamanho * 0.035;
+      ctx.stroke();
+
+      // Pupila
+      ctx.beginPath();
+      ctx.arc(c, c, r * 0.18, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFD700';
+      ctx.fill();
+
+      // Brilho da pupila
+      ctx.beginPath();
+      ctx.arc(c - r * 0.06, c - r * 0.06, r * 0.06, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fill();
+
+      return canvas;
+    }
+
+    function gerarTodos() {
+      const container = document.getElementById('icones');
+      container.innerHTML = '';
+
+      tamanhos.forEach(tam => {
+        const canvas = desenharIcone(tam);
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `icon-${tam}.png`;
+        link.textContent = `⬇ Baixar icon-${tam}.png`;
+
+        const item = document.createElement('div');
+        item.className = 'icone-item';
+
+        const label = document.createElement('div');
+        label.textContent = `${tam}×${tam}`;
+        label.style.marginBottom = '6px';
+        label.style.fontSize = '0.8rem';
+        label.style.color = '#aaa';
+
+        // Exibe miniatura de no máximo 96px
+        const mini = desenharIcone(Math.min(tam, 96));
+        item.appendChild(label);
+        item.appendChild(mini);
+        item.appendChild(link);
+        container.appendChild(item);
+      });
+    }
+  </script>
+</body>
+</html>
