@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="theme-color"
+        content="#000000"
+    >
+
+    <title>Óculos Assistivo</title>
+
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
+</head>
+
+<body>
+
+    <main class="app">
+
+        <header class="header">
+
+            <h1>Óculos Assistivo</h1>
+
+            <p id="status">
+                Sistema desligado
+            </p>
+
+        </header>
+
+
+        <!-- CÂMERA -->
+
+        <section class="camera-container">
+
+            <video
+                id="camera"
+                autoplay
+                muted
+                playsinline
+            ></video>
+
+            <canvas
+                id="detectionCanvas"
+            ></canvas>
+
+            <div
+                id="cameraMessage"
+                class="camera-message"
+            >
+                Pressione iniciar
+            </div>
+
+        </section>
+
+
+        <!-- CONTROLES -->
+
+        <section class="controls">
+
+            <button
+                id="startButton"
+                class="primary"
+            >
+                📷 Iniciar sistema
+            </button>
+
+            <button
+                id="stopButton"
+                disabled
+            >
+                ⛔ Parar
+            </button>
+
+            <button
+                id="voiceButton"
+            >
+                🎤 Comando de voz
+            </button>
+
+        </section>
+
+
+        <!-- INFORMAÇÕES -->
+
+        <section class="panel">
+
+            <h2>
+                Detecções
+            </h2>
+
+            <div id="detections">
+                Nenhum objeto detectado.
+            </div>
+
+        </section>
+
+
+        <section class="panel">
+
+            <h2>
+                Último aviso
+            </h2>
+
+            <p id="lastAlert">
+                Nenhum aviso.
+            </p>
+
+        </section>
+
+
+        <section class="panel">
+
+            <h2>
+                Sistema
+            </h2>
+
+            <div class="system-info">
+
+                <span>
+                    Câmera:
+                    <strong id="cameraStatus">
+                        Desligada
+                    </strong>
+                </span>
+
+                <span>
+                    IA:
+                    <strong id="aiStatus">
+                        Desligada
+                    </strong>
+                </span>
+
+                <span>
+                    Voz:
+                    <strong id="voiceStatus">
+                        Disponível
+                    </strong>
+                </span>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ============================= -->
+    <!-- BIBLIOTECAS DE IA              -->
+    <!-- ============================= -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+
+    <!-- ============================= -->
+    <!-- NOSSOS ARQUIVOS                -->
+    <!-- ============================= -->
+
+    <script src="js/speech.js"></script>
+
+    <script src="js/proximity.js"></script>
+
+    <script src="js/alerts.js"></script>
+
+    <script src="js/detector.js"></script>
+
+    <script src="js/camera.js"></script>
+
+    <script src="js/commands.js"></script>
+
+    <script src="ai/face.js"></script>
+
+    <script src="ai/crosswalk.js"></script>
+
+    <script src="js/app.js"></script>
+
+</body>
+
+</html>
